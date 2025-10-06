@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bengaluru Civic Issues Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto+Slab:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 </head>
@@ -86,6 +89,7 @@
                 <div class="form-group">
                     <label for="location">Location *</label>
                     <input type="text" id="location" placeholder="Enter location or drag marker on map" required>
+                    <div id="location-suggestions" class="location-suggestions"></div>
                     <div id="location-map"></div>
                 </div>
                 
@@ -130,8 +134,10 @@
         </div>
     </footer>
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css">
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

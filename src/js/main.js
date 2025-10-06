@@ -423,21 +423,154 @@ function initLocationMap() {
         locationMarker = L.marker([12.9716, 77.5946], {draggable: true}).addTo(locationMap);
         
         const locationInput = document.getElementById('location');
+        const suggestionsContainer = document.getElementById('location-suggestions');
+        
+        // Create a Nominatim geocoder instance without adding to map
+        const geocoder = L.Control.Geocoder.nominatim();
+        
+        // Hide suggestions function
+        function hideSuggestions() {
+            suggestionsContainer.classList.remove('show');
+        }
+        
+        // Render suggestions function
+        function renderSuggestions(results) {
+            if (!results || results.length === 0) {
+                hideSuggestions();
+                return;
+            }
+            
+            suggestionsContainer.innerHTML = '<ul></ul>';
+            const ul = suggestionsContainer.querySelector('ul');
+            
+            results.forEach((result, index) => {
+                const li = document.createElement('li');
+                li.textContent = result.name;
+                li.dataset.index = index;
+                li.__data = result; // Store the result data for keyboard navigation
+                
+                li.addEventListener('click', () => {
+                    selectSuggestion(result);
+                });
+                
+                ul.appendChild(li);
+            });
+            
+            suggestionsContainer.classList.add('show');
+        }
+        
+        // Select suggestion function
+        function selectSuggestion(result) {
+            const { center, name } = result;
+            locationMarker.setLatLng(center);
+            locationMap.setView(center, 16);
+            locationInput.value = name;
+            locationInput.dataset.coordinates = `${center.lat},${center.lng}`;
+            hideSuggestions();
+        }
+        
+        // Autocomplete flow
+        let suggestionTimeout;
+        let selectedSuggestionIndex = -1;
+        
+        locationInput.addEventListener('input', () => {
+            const query = locationInput.value.trim();
+            clearTimeout(suggestionTimeout);
+            if (query.length < 3) { 
+                hideSuggestions(); 
+                selectedSuggestionIndex = -1;
+                return; 
+            }
+            suggestionTimeout = setTimeout(() => {
+                geocoder.geocode(query, results => {
+                    renderSuggestions(results);
+                    selectedSuggestionIndex = -1;
+                });
+            }, 300);
+        });
+        
+        // Keyboard navigation
+        locationInput.addEventListener('keydown', (e) => {
+            const suggestions = suggestionsContainer.querySelectorAll('li');
+
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (suggestions.length === 0) {
+                    // optional: trigger a search immediately using the current input
+                    geocoder.geocode(locationInput.value.trim(), renderSuggestions);
+                } else if (selectedSuggestionIndex >= 0) {
+                    const result = suggestions[selectedSuggestionIndex].__data;
+                    if (result) selectSuggestion(result);
+                } else {
+                    // pick the first result by default
+                    const result = suggestions[0].__data;
+                    if (result) selectSuggestion(result);
+                }
+                return; // stop early so Enter never falls through
+            }
+
+            if (suggestions.length === 0) return;
+
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    selectedSuggestionIndex = (selectedSuggestionIndex + 1) % suggestions.length;
+                    updateSelectedSuggestion(suggestions);
+                    break;
+                    
+                case 'ArrowUp':
+                    e.preventDefault();
+                    selectedSuggestionIndex =
+                        selectedSuggestionIndex <= 0 ? suggestions.length - 1 : selectedSuggestionIndex - 1;
+                    updateSelectedSuggestion(suggestions);
+                    break;
+                    
+                case 'Escape':
+                    hideSuggestions();
+                    selectedSuggestionIndex = -1;
+                    break;
+            }
+        });
+        
+        // Update selected suggestion display
+        function updateSelectedSuggestion(suggestions) {
+            suggestions.forEach((li, index) => {
+                if (index === selectedSuggestionIndex) {
+                    li.classList.add('selected');
+                } else {
+                    li.classList.remove('selected');
+                }
+            });
+        }
+        
+        // Click outside to hide suggestions
+        document.addEventListener('click', (e) => {
+            if (!locationInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+                hideSuggestions();
+                selectedSuggestionIndex = -1;
+            }
+        });
         
         // Update the location input when marker is dragged
         locationMarker.on('dragend', function(event) {
             const { lat, lng } = locationMarker.getLatLng();
             locationInput.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            locationInput.dataset.coordinates = `${lat},${lng}`;
         });
         
-        // Update the marker position when the location input changes
+        // Update the marker position when the location input changes (for coordinate input)
         locationInput.addEventListener('change', function() {
             const locationValue = this.value;
+            // Check if the input contains coordinates (lat, lng)
             if (locationValue.includes(',')) {
-                const [lat, lng] = locationValue.split(',').map(Number);
+                const parts = locationValue.split(',');
+                // Check if both parts are numbers (coordinates)
+                const lat = parseFloat(parts[0].trim());
+                const lng = parseFloat(parts[1].split(' ')[0].trim()); // Handle cases with additional text after coordinates
                 if (!isNaN(lat) && !isNaN(lng)) {
                     locationMarker.setLatLng([lat, lng]);
                     locationMap.setView([lat, lng], 15);
+                    locationInput.dataset.coordinates = `${lat},${lng}`;
                 }
             }
         });
@@ -445,7 +578,9 @@ function initLocationMap() {
         // Also update marker when clicking on the map
         locationMap.on('click', function(e) {
             locationMarker.setLatLng(e.latlng);
-            locationInput.value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+            const { lat, lng } = e.latlng;
+            locationInput.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            locationInput.dataset.coordinates = `${lat},${lng}`;
         });
     }
 }
