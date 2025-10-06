@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bengaluru Civic Issues Hub</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Bengaluru Civic Issues Hub</h1>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active" data-view="map">Map View</a></li>
+                    <li><a href="#" data-view="list">List View</a></li>
+                    <li><a href="#" data-view="submit">Report Issue</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Map View -->
+        <section id="map-view" class="view active">
+            <div id="map"></div>
+            <div class="stats">
+                <p>Total submitted: <span id="total-submitted">0</span> | 
+                   Published: <span id="total-published">0</span> | 
+                   Resolved: <span id="total-resolved">0</span></p>
+            </div>
+        </section>
+
+        <!-- List View -->
+        <section id="list-view" class="view">
+            <div class="filters">
+                <select id="category-filter">
+                    <option value="">All Categories</option>
+                    <option value="Roads">Roads</option>
+                    <option value="Water">Water</option>
+                    <option value="Waste">Waste</option>
+                    <option value="Power">Power</option>
+                    <option value="Public Health">Public Health</option>
+                    <option value="Others">Others</option>
+                </select>
+                <select id="status-filter">
+                    <option value="">All Statuses</option>
+                    <option value="New">New</option>
+                    <option value="Verified">Verified</option>
+                    <option value="Published">Published</option>
+                    <option value="Resolved">Resolved</option>
+                </select>
+                <input type="text" id="location-filter" placeholder="Filter by location...">
+            </div>
+            <div id="issues-list"></div>
+        </section>
+
+        <!-- Report Issue Form -->
+        <section id="submit-view" class="view">
+            <h2>Report a Civic Issue</h2>
+            <form id="civic-issue-form">
+                <div class="form-group">
+                    <label for="category">Category *</label>
+                    <select id="category" required>
+                        <option value="">Select Category</option>
+                        <option value="Roads">Roads</option>
+                        <option value="Water">Water</option>
+                        <option value="Waste">Waste</option>
+                        <option value="Power">Power</option>
+                        <option value="Public Health">Public Health</option>
+                        <option value="Others">Others</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="title">Title (≤100 chars) *</label>
+                    <input type="text" id="title" maxlength="100" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description (≤250 chars) *</label>
+                    <textarea id="description" maxlength="250" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="location">Location *</label>
+                    <input type="text" id="location" placeholder="Enter location or drag marker on map" required>
+                    <div id="location-map"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="image">Image *</label>
+                    <input type="file" id="image" accept="image/*" required>
+                    <div id="image-preview"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="consent" required>
+                        <span class="checkmark"></span>
+                        I agree this info may be published by Deccan Herald
+                    </label>
+                </div>
+                
+                <button type="submit">Continue</button>
+            </form>
+            
+            <!-- Preview Card (shown after form submission, before login) -->
+            <div id="preview-card" class="preview-card hidden">
+                <h3>Issue Preview</h3>
+                <div class="issue-card">
+                    <div class="card-header">
+                        <span class="category-tag" id="preview-category"></span>
+                    </div>
+                    <h4 id="preview-title"></h4>
+                    <p id="preview-description"></p>
+                    <p><strong>Location:</strong> <span id="preview-location"></span></p>
+                    <div id="preview-image-container"></div>
+                </div>
+                <p>Please sign in to submit your issue</p>
+                <button id="login-btn">Sign In to Submit</button>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Deccan Herald. Civic Issues Hub - Connecting citizens with solutions.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

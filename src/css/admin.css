@@ -1,0 +1,218 @@
+/* Admin Dashboard Styles */
+:root {
+    --admin-primary: #1d4ed8;
+    --admin-secondary: #6b7280;
+    --admin-success: #16a34a;
+    --admin-warning: #d97706;
+    --admin-danger: #dc2626;
+    --admin-light-bg: #f1f5f9;
+    --admin-dark-text: #0f172a;
+}
+
+/* General Admin Styles */
+body.admin {
+    background-color: var(--admin-light-bg);
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-card h3 {
+    color: var(--admin-secondary);
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+
+.stat-card p {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--admin-primary);
+    margin: 0;
+}
+
+/* Table Styles */
+#issues-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+#issues-table th,
+#issues-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#issues-table th {
+    background-color: var(--admin-primary);
+    color: white;
+    font-weight: bold;
+}
+
+#issues-table tr:hover {
+    background-color: #f8fafc;
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.status-new { background-color: #fef3c7; color: #d97706; }
+.status-verified { background-color: #dbeafe; color: #2563eb; }
+.status-published { background-color: #dcfce7; color: #16a34a; }
+.status-resolved { background-color: #ede9fe; color: #7c3aed; }
+
+/* Action buttons in table */
+.action-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.action-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: white;
+}
+
+.btn-view { background-color: var(--admin-primary); }
+.btn-edit { background-color: var(--admin-warning); }
+.btn-delete { background-color: var(--admin-danger); }
+
+/* Chart Container */
+.chart-container {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-top: 20px;
+}
+
+/* Settings Section */
+.settings-section {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.settings-section h3 {
+    margin-top: 0;
+    color: var(--admin-dark-text);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 800px;
+    position: relative;
+}
+
+.close {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    color: var(--admin-secondary);
+}
+
+.close:hover {
+    color: var(--admin-danger);
+}
+
+#issue-details {
+    margin-top: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+#issue-details img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin-top: 10px;
+    display: block;
+}
+
+.modal-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.modal-actions button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-primary { background-color: var(--admin-primary); color: white; }
+.btn-secondary { background-color: var(--admin-secondary); color: white; }
+.btn-success { background-color: var(--admin-success); color: white; }
+.btn-danger { background-color: var(--admin-danger); color: white; }
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    #issues-table {
+        font-size: 0.9rem;
+    }
+    
+    #issues-table th,
+    #issues-table td {
+        padding: 8px;
+    }
+    
+    .modal-content {
+        width: 95%;
+        margin: 10% auto;
+        padding: 15px;
+    }
+}

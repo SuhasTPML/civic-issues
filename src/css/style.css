@@ -1,0 +1,423 @@
+/* Bengaluru Civic Issues Hub - CSS Styles */
+:root {
+    --primary-color: #f97316; /* Orange */
+    --secondary-color: #6b7280; /* Gray */
+    --accent-color: #1d4ed8; /* Blue */
+    --light-bg: #f8fafc;
+    --dark-text: #1e293b;
+    --border-color: #e2e8f0;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: var(--dark-text);
+    background-color: var(--light-bg);
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Header Styles */
+header {
+    background-color: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+}
+
+header h1 {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+}
+
+nav ul {
+    display: flex;
+    list-style: none;
+}
+
+nav ul li {
+    margin-left: 20px;
+}
+
+nav ul li a {
+    text-decoration: none;
+    color: var(--secondary-color);
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+nav ul li a:hover,
+nav ul li a.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Main Content */
+main {
+    padding: 30px 0;
+}
+
+.view {
+    display: none;
+}
+
+.view.active {
+    display: block;
+}
+
+/* Map View */
+#map {
+    height: 500px;
+    width: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.stats {
+    text-align: center;
+    padding: 15px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* List View */
+.filters {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filters select,
+.filters input {
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    min-width: 200px;
+}
+
+#issues-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.issue-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.issue-card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.category-tag {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.issue-card h4 {
+    margin: 10px 0;
+    color: var(--dark-text);
+}
+
+.issue-card p {
+    color: var(--secondary-color);
+    margin-bottom: 10px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.status-new { background-color: #fef3c7; color: #d97706; }
+.status-verified { background-color: #dbeafe; color: #2563eb; }
+.status-published { background-color: #dcfce7; color: #16a34a; }
+.status-resolved { background-color: #ede9fe; color: #7c3aed; }
+
+/* Submit Form */
+#submit-view h2 {
+    margin-bottom: 20px;
+    color: var(--dark-text);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: var(--dark-text);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.checkbox-container {
+    display: block;
+    position: relative;
+    padding-left: 30px;
+    cursor: pointer;
+    font-size: 1rem;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.checkbox-container input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 20px;
+    width: 20px;
+    background-color: #eee;
+    border-radius: 4px;
+}
+
+.checkbox-container:hover input ~ .checkmark {
+    background-color: #ccc;
+}
+
+.checkbox-container input:checked ~ .checkmark {
+    background-color: var(--primary-color);
+}
+
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+    display: block;
+}
+
+.checkbox-container .checkmark:after {
+    left: 7px;
+    top: 3px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    -webkit-transform: rotate(45deg);
+    -ms-transform: rotate(45deg);
+    transform: rotate(45deg);
+}
+
+form button {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+form button:hover {
+    background-color: #ea580c;
+}
+
+#location-map {
+    height: 200px;
+    margin-top: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+/* Preview Card */
+.preview-card {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.preview-card h3 {
+    margin-bottom: 15px;
+    color: var(--dark-text);
+}
+
+#preview-image-container {
+    margin-top: 10px;
+}
+
+#preview-image-container img {
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+#login-btn {
+    background-color: var(--accent-color);
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    margin-top: 15px;
+    transition: background-color 0.3s ease;
+}
+
+#login-btn:hover {
+    background-color: #1e40af;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Footer */
+footer {
+    background-color: var(--dark-text);
+    color: white;
+    padding: 20px 0;
+    text-align: center;
+    margin-top: 40px;
+}
+
+footer .container {
+    padding: 0 20px;
+}
+
+/* Map Markers */
+.map-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    cursor: pointer;
+}
+
+.marker-roads { border-color: #ef4444; }
+.marker-water { border-color: #3b82f6; }
+.marker-waste { border-color: #8b5cf6; }
+.marker-power { border-color: #f59e0b; }
+.marker-health { border-color: #10b981; }
+.marker-other { border-color: #6b7280; }
+
+.popup-content h4 {
+    margin: 0 0 5px 0;
+    font-size: 1rem;
+}
+
+.popup-content .category-tag {
+    display: inline-block;
+    background-color: var(--primary-color);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    margin: 5px 0;
+}
+
+.popup-content p {
+    margin: 5px 0;
+    font-size: 0.9rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    nav ul {
+        flex-direction: column;
+    }
+    
+    nav ul li {
+        margin: 5px 0;
+    }
+    
+    .filters {
+        flex-direction: column;
+    }
+    
+    .filters select,
+    .filters input {
+        min-width: 100%;
+    }
+    
+    #issues-list {
+        grid-template-columns: 1fr;
+    }
+    
+    header .container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    header h1 {
+        margin-bottom: 15px;
+    }
+}
