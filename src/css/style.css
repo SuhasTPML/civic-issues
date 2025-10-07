@@ -342,6 +342,75 @@ form button:hover {
     border-bottom: none;
 }
 
+.search-status {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    color: var(--secondary-color);
+    background: #f0f9ff;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-top: 5px;
+}
+
+.search-status.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #dc2626;
+}
+
+.no-results {
+    padding: 15px;
+    text-align: center;
+}
+
+.no-results p {
+    margin: 5px 0;
+    color: var(--secondary-color);
+}
+
+.suggestion-hint {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--secondary-color);
+}
+
+.suggestion-header {
+    padding: 8px 10px !important;
+    font-weight: bold;
+    font-size: 0.85rem;
+    color: var(--secondary-color);
+    background-color: #f8fafc;
+    cursor: default !important;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.suggestion-header:hover {
+    background-color: #f8fafc !important;
+}
+
+.suggestion-name {
+    display: block;
+    font-weight: 500;
+    color: var(--dark-text);
+}
+
+.suggestion-detail {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--secondary-color);
+    margin-top: 2px;
+}
+
+.suggestion-map-option {
+    border-top: 2px solid var(--border-color) !important;
+    background-color: #fef9e7 !important;
+    cursor: pointer !important;
+}
+
+.suggestion-map-option:hover {
+    background-color: #fcf3cf !important;
+}
+
 /* Nearby Features Panel */
 .map-container {
     position: relative;

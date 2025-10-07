@@ -430,6 +430,7 @@ function initLocationMap() {
 
         // Variable to store current nearby features for searching
         let currentFeatures = [];
+        let currentSearchAbort = null; // AbortController for canceling stale searches
 
         // Fetch nearby features for the default Bangalore location on page load
         // Use a larger radius to get more features for searching across Bangalore
@@ -437,56 +438,129 @@ function initLocationMap() {
             fetchAndDisplayNearbyFeatures(defaultLat, defaultLng, 2000); // 2km radius for better coverage
         }, 500);
 
-        // Create a Nominatim geocoder instance without adding to map
+        // Create a Nominatim geocoder instance scoped to Bengaluru
         console.log('L.Control.Geocoder:', L.Control.Geocoder);
-        const geocoder = L.Control.Geocoder.nominatim();
-        console.log('Geocoder initialized:', geocoder);
+        const geocoder = L.Control.Geocoder.nominatim({
+            geocodingQueryParams: {
+                // Bengaluru bounding box (SW_lng,SW_lat,NE_lng,NE_lat)
+                viewbox: '77.4602,12.8349,77.7845,13.1439',
+                bounded: 1, // Restrict results to viewbox
+                countrycodes: 'in', // Restrict to India
+                addressdetails: 1, // Get detailed address info
+                limit: 10 // Max results per query
+            }
+        });
+        console.log('Geocoder initialized with Bengaluru bounds:', geocoder);
         
         // Hide suggestions function
         function hideSuggestions() {
             suggestionsContainer.classList.remove('show');
         }
         
-        // Render suggestions function
+        // Create a suggestion list item
+        function createSuggestionItem(result, index) {
+            const li = document.createElement('li');
+
+            // Check if this is a nearby feature or a geocoder result
+            if (result.raw && result.raw.id) {
+                // This is a nearby feature result
+                li.innerHTML = `
+                    <span class="suggestion-name">${result.name}</span>
+                    <span class="suggestion-detail">${result.raw.category || 'nearby feature'}</span>
+                `;
+                li.title = `Nearby ${result.raw.category || 'feature'}`;
+            } else {
+                // This is a geocoder result
+                const locality = extractLocality(result);
+                li.innerHTML = `
+                    <span class="suggestion-name">${result.name}</span>
+                    <span class="suggestion-detail">${locality}</span>
+                `;
+            }
+
+            li.dataset.index = index;
+            li.__data = result; // Store the result data for keyboard navigation
+
+            li.addEventListener('click', () => {
+                selectSuggestion(result);
+            });
+
+            return li;
+        }
+
+        // Render suggestions function with grouping
         function renderSuggestions(results) {
             if (!results || results.length === 0) {
-                hideSuggestions();
+                suggestionsContainer.innerHTML = `
+                    <div class="no-results">
+                        <p>No locations found in Bengaluru.</p>
+                        <p class="suggestion-hint">Try 'BTM Layout', 'Koramangala', 'MG Road', or drop a pin on the map.</p>
+                    </div>
+                `;
+                suggestionsContainer.classList.add('show');
                 return;
             }
-            
+
+            // Group results by type
+            const nearbyResults = results.filter(r => r.raw && r.raw.id);
+            const geocoderResults = results.filter(r => !r.raw || !r.raw.id);
+
             suggestionsContainer.innerHTML = '<ul></ul>';
             const ul = suggestionsContainer.querySelector('ul');
-            
-            results.forEach((result, index) => {
-                const li = document.createElement('li');
-                
-                // Check if this is a nearby feature or a geocoder result
-                if (result.raw && result.raw.id) {
-                    // This is a nearby feature result
-                    li.textContent = `${result.name} (nearby)`;
-                    li.title = `Click to select this nearby ${result.raw.category || 'feature'}`;
-                } else {
-                    // This is a geocoder result
-                    li.textContent = result.name;
-                }
-                
-                li.dataset.index = index;
-                li.__data = result; // Store the result data for keyboard navigation
-                
-                li.addEventListener('click', () => {
-                    selectSuggestion(result);
+            let index = 0;
+
+            // Add "Nearby Features" section if any
+            if (nearbyResults.length > 0) {
+                const header = document.createElement('li');
+                header.className = 'suggestion-header';
+                header.textContent = 'Nearby Features';
+                ul.appendChild(header);
+
+                nearbyResults.forEach((result) => {
+                    ul.appendChild(createSuggestionItem(result, index++));
                 });
-                
-                ul.appendChild(li);
+            }
+
+            // Add "City Locations" section if any
+            if (geocoderResults.length > 0) {
+                const header = document.createElement('li');
+                header.className = 'suggestion-header';
+                header.textContent = 'Bengaluru Locations';
+                ul.appendChild(header);
+
+                geocoderResults.forEach((result) => {
+                    ul.appendChild(createSuggestionItem(result, index++));
+                });
+            }
+
+            // Always add "Use map location" option at the end
+            const mapOption = document.createElement('li');
+            mapOption.className = 'suggestion-map-option';
+            mapOption.innerHTML = `
+                <span class="suggestion-name">📍 Drop a pin on the map instead</span>
+                <span class="suggestion-detail">Click anywhere on the map to select a location</span>
+            `;
+            mapOption.addEventListener('click', () => {
+                hideSuggestions();
+                locationSearchInput.blur();
+                // Highlight the map briefly to draw attention
+                const mapEl = document.getElementById('location-map');
+                mapEl.style.border = '3px solid var(--primary-color)';
+                mapEl.style.boxShadow = '0 0 10px var(--primary-color)';
+                setTimeout(() => {
+                    mapEl.style.border = '1px solid var(--border-color)';
+                    mapEl.style.boxShadow = 'none';
+                }, 2000);
             });
-            
+            ul.appendChild(mapOption);
+
             suggestionsContainer.classList.add('show');
         }
         
         // Select suggestion function
         function selectSuggestion(result) {
             let lat, lng, name;
-            
+
             // Check if this is a nearby feature or a geocoder result
             if (result.raw && result.raw.id) {
                 // This is a nearby feature result
@@ -500,17 +574,20 @@ function initLocationMap() {
                 lng = result.center.lng;
                 name = result.name;
             }
-            
+
             // Update the marker and map
             locationMarker.setLatLng([lat, lng]);
             locationMap.setView([lat, lng], 16);
-            
+
             // Update the search input with the selected location name
             locationSearchInput.value = name;
-            
+
             // Update the coordinates field with the coordinates
             locationCoordsInput.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            
+
+            // Refresh nearby features for the selected location
+            fetchAndDisplayNearbyFeatures(lat, lng);
+
             hideSuggestions();
         }
         
@@ -522,51 +599,150 @@ function initLocationMap() {
             const query = locationSearchInput.value.trim();
             console.log('Input event fired, query:', query);
             clearTimeout(suggestionTimeout);
-            if (query.length < 1) { // Lowered threshold for better UX
+            if (query.length < 3) { // Require minimum 3 characters for city-wide search
                 hideSuggestions();
                 selectedSuggestionIndex = -1;
                 return;
             }
             suggestionTimeout = setTimeout(() => {
+                // Cancel previous search if still running
+                if (currentSearchAbort) {
+                    console.log('Aborting previous search');
+                    currentSearchAbort.abort();
+                }
+
+                // Create new abort controller
+                currentSearchAbort = new AbortController();
+                const signal = currentSearchAbort.signal;
+
+                // Show loading state
+                const searchStatus = document.getElementById('search-status');
+                searchStatus.textContent = 'Searching Bengaluru...';
+                searchStatus.classList.remove('hidden', 'error');
+
                 console.log('Timeout fired, starting geocode for:', query);
+
                 // Run both geocoder search and nearby features search
-                Promise.all([
-                    new Promise((resolve, reject) => {
-                        try {
-                            console.log('Calling geocoder.geocode...');
-                            geocoder.geocode(query, (results) => {
-                                console.log('Geocoder callback fired, results:', results);
-                                resolve(results || []);
-                            });
-                            // Add a timeout in case the geocoder never calls back
-                            setTimeout(() => {
-                                console.warn('Geocoder timeout - no response after 5s');
-                                resolve([]);
-                            }, 5000);
-                        } catch (error) {
-                            console.error('Geocoder error:', error);
-                            reject(error);
-                        }
-                    }),
-                    // Always search nearby features (they might already be loaded)
-                    searchNearbyFeatures(query)
+                Promise.race([
+                    Promise.all([
+                        new Promise((resolve, reject) => {
+                            if (signal.aborted) {
+                                reject(new DOMException('Aborted', 'AbortError'));
+                                return;
+                            }
+
+                            try {
+                                console.log('Calling geocoder.geocode...');
+                                geocoder.geocode(query, (results) => {
+                                    if (signal.aborted) {
+                                        console.log('Geocoder result arrived but search was aborted');
+                                        reject(new DOMException('Aborted', 'AbortError'));
+                                        return;
+                                    }
+                                    console.log('Geocoder callback fired, results:', results);
+                                    resolve(results || []);
+                                });
+
+                                // Abort listener
+                                signal.addEventListener('abort', () => {
+                                    console.log('Abort signal received');
+                                    reject(new DOMException('Aborted', 'AbortError'));
+                                });
+                            } catch (error) {
+                                console.error('Geocoder error:', error);
+                                reject(error);
+                            }
+                        }),
+                        // Always search nearby features (they might already be loaded)
+                        searchNearbyFeatures(query, signal)
+                    ]),
+                    // Timeout after 5 seconds
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Search timeout')), 5000)
+                    )
                 ]).then(([geocoderResults, nearbyResults]) => {
+                    if (signal.aborted) {
+                        console.log('Results arrived but search was aborted, ignoring');
+                        return;
+                    }
+                    // Hide loading state
+                    const searchStatus = document.getElementById('search-status');
+                    searchStatus.classList.add('hidden');
+
                     console.log('Combined results:', { geocoderResults, nearbyResults });
                     // Combine results: prioritize nearby results first, then geocoder results
                     const combinedResults = [...nearbyResults, ...geocoderResults];
-                    console.log('Total combined results:', combinedResults.length);
-                    renderSuggestions(combinedResults);
+                    // Deduplicate combined results
+                    const deduplicatedResults = deduplicateResults(combinedResults);
+                    console.log('Total combined results:', combinedResults.length, 'After deduplication:', deduplicatedResults.length);
+                    renderSuggestions(deduplicatedResults);
                     selectedSuggestionIndex = -1;
                 }).catch(error => {
+                    // Don't show error for aborted requests
+                    if (error.name === 'AbortError') {
+                        console.log('Search aborted, ignoring error');
+                        return;
+                    }
+
                     console.error('Error fetching suggestions:', error);
+                    const searchStatus = document.getElementById('search-status');
+
+                    if (error.message === 'Search timeout') {
+                        searchStatus.textContent = 'Search timed out. Please try again.';
+                    } else {
+                        searchStatus.textContent = 'Search failed. Check your connection and try again.';
+                    }
+
+                    searchStatus.classList.add('error');
+                    searchStatus.classList.remove('hidden');
                     hideSuggestions();
                 });
             }, 300);
         });
         
+        // Deduplicate results by comparing name and location
+        function deduplicateResults(results) {
+            const seen = new Map();
+            const deduplicated = [];
+
+            results.forEach(result => {
+                // Create unique key from name and approximate coordinates
+                const lat = result.center?.lat || result.raw?.lat || 0;
+                const lng = result.center?.lng || result.raw?.lng || 0;
+                const key = `${result.name.toLowerCase()}_${lat.toFixed(3)}_${lng.toFixed(3)}`;
+
+                if (!seen.has(key)) {
+                    seen.set(key, true);
+                    deduplicated.push(result);
+                }
+            });
+
+            return deduplicated;
+        }
+
+        // Extract locality from geocoder HTML response
+        function extractLocality(result) {
+            if (result.html && typeof result.html === 'string') {
+                // Parse HTML to get locality details
+                const parts = result.html.split(',');
+                if (parts.length > 1) {
+                    return parts.slice(1, 3).join(',').trim();
+                }
+            }
+            if (result.properties) {
+                return result.properties.display_name || 'Bengaluru';
+            }
+            return 'Bengaluru';
+        }
+
         // Function to search through nearby features
-        function searchNearbyFeatures(query) {
-            return new Promise((resolve) => {
+        function searchNearbyFeatures(query, signal = null) {
+            return new Promise((resolve, reject) => {
+                if (signal?.aborted) {
+                    reject(new DOMException('Aborted', 'AbortError'));
+                    return;
+                }
+
                 console.log('Searching nearby features, currentFeatures:', currentFeatures);
                 // If we have current nearby features, search through them
                 if (currentFeatures && currentFeatures.length > 0) {
