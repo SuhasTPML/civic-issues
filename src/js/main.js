@@ -226,30 +226,121 @@ function initFormHandling() {
         previewCard.classList.add('hidden');
     });
     
+    // Multi-image handling with DataTransfer for managing files
+    let uploadedImages = [];
+    const MAX_IMAGES = 5;
+
     // Image preview functionality
     document.getElementById('image').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const previewDiv = document.getElementById('image-preview');
-                previewDiv.innerHTML = `<img src="${event.target.result}" alt="Preview" style="max-width: 100%; max-height: 200px; margin-top: 10px;">`;
-                
-                // Extract GPS data from EXIF if available
-                exifr.gps(file).then(gps => {
-                    if (!gps) return;
-                    const lat = gps.latitude;
-                    const lng = gps.longitude;
-                    if (Number.isFinite(lat) && Number.isFinite(lng) && locationMap && locationMarker) {
-                        locationMarker.setLatLng([lat, lng]);
-                        locationMap.setView([lat, lng], 15);
-                        document.getElementById('location-coords').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-                    }
-                }).catch(err => console.warn('No GPS data', err));
-            };
-            reader.readAsDataURL(file);
+        const files = Array.from(e.target.files);
+
+        // Check if adding these files would exceed the limit
+        if (uploadedImages.length + files.length > MAX_IMAGES) {
+            alert(`You can only upload up to ${MAX_IMAGES} images. Currently you have ${uploadedImages.length} image(s).`);
+            return;
+        }
+
+        // Add new files to uploadedImages array
+        files.forEach(file => {
+            if (uploadedImages.length < MAX_IMAGES) {
+                uploadedImages.push({
+                    file: file,
+                    dataUrl: null,
+                    metadata: {}
+                });
+            }
+        });
+
+        // Process and preview all images
+        renderImagePreviews();
+
+        // Extract GPS from first image if available
+        if (files.length > 0) {
+            exifr.gps(files[0]).then(gps => {
+                if (!gps) return;
+                const lat = gps.latitude;
+                const lng = gps.longitude;
+                if (Number.isFinite(lat) && Number.isFinite(lng) && locationMap && locationMarker) {
+                    locationMarker.setLatLng([lat, lng]);
+                    locationMap.setView([lat, lng], 15);
+                    document.getElementById('location-coords').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                }
+            }).catch(err => console.warn('No GPS data', err));
         }
     });
+
+    // Render image previews with delete buttons
+    function renderImagePreviews() {
+        const previewDiv = document.getElementById('image-preview');
+        const imageCountDiv = document.getElementById('image-count');
+
+        // Update count
+        imageCountDiv.textContent = `${uploadedImages.length} / ${MAX_IMAGES} images`;
+        imageCountDiv.classList.remove('hidden');
+
+        // Clear previous previews
+        previewDiv.innerHTML = '';
+
+        // Process each image
+        uploadedImages.forEach((imageObj, index) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'image-preview-item';
+
+            // If dataUrl is already available, use it
+            if (imageObj.dataUrl) {
+                renderImageItem(itemDiv, imageObj, index);
+            } else {
+                // Load the image
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    imageObj.dataUrl = event.target.result;
+                    renderImageItem(itemDiv, imageObj, index);
+                };
+                reader.readAsDataURL(imageObj.file);
+            }
+
+            previewDiv.appendChild(itemDiv);
+        });
+
+        // Update the file input with current files
+        updateFileInput();
+    }
+
+    // Render individual image item
+    function renderImageItem(container, imageObj, index) {
+        const source = imageObj.metadata.photoSource === 'camera' ? 'Camera' : 'Upload';
+
+        container.innerHTML = `
+            <img src="${imageObj.dataUrl}" alt="Preview ${index + 1}">
+            <button type="button" class="delete-btn" data-index="${index}">×</button>
+            <span class="image-label">${source} ${index + 1}</span>
+        `;
+
+        // Add delete button event
+        const deleteBtn = container.querySelector('.delete-btn');
+        deleteBtn.addEventListener('click', function() {
+            deleteImage(index);
+        });
+    }
+
+    // Delete image by index
+    function deleteImage(index) {
+        uploadedImages.splice(index, 1);
+        renderImagePreviews();
+    }
+
+    // Update the file input to reflect current uploaded images
+    function updateFileInput() {
+        const dataTransfer = new DataTransfer();
+        uploadedImages.forEach(imgObj => {
+            dataTransfer.items.add(imgObj.file);
+        });
+        document.getElementById('image').files = dataTransfer.files;
+    }
+
+    // Expose to window for camera capture integration
+    window.uploadedImages = uploadedImages;
+    window.renderImagePreviews = renderImagePreviews;
 }
 
 // Save draft to localStorage
@@ -1401,6 +1492,7 @@ function initLocationMap() {
     const capturedImage = document.getElementById('captured-image');
     const retakePhotoBtn = document.getElementById('retake-photo');
     const usePhotoBtn = document.getElementById('use-photo');
+    const retryLocationBtn = document.getElementById('retry-location');
     const cameraStatus = document.getElementById('camera-status');
     const locationStatus = document.getElementById('location-status');
     const locationText = document.getElementById('location-text');
@@ -1625,6 +1717,13 @@ function initLocationMap() {
             return;
         }
 
+        // Check if we've reached the image limit
+        const currentImageCount = uploadedImages ? uploadedImages.length : 0;
+        if (currentImageCount >= 5) {
+            alert('Maximum 5 images allowed. Please delete an image first.');
+            return;
+        }
+
         // Validate location
         if (!capturedLocation) {
             const confirmWithoutLocation = confirm(
@@ -1640,14 +1739,38 @@ function initLocationMap() {
         // Create a File object from the blob
         const file = new File([capturedBlob], `civic-issue-${Date.now()}.jpg`, { type: 'image/jpeg' });
 
-        // Create a DataTransfer to set the file input
-        const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(file);
-        imageInput.files = dataTransfer.files;
+        // Add to uploadedImages array if it exists (from initFormHandling)
+        if (window.uploadedImages) {
+            const imageObj = {
+                file: file,
+                dataUrl: URL.createObjectURL(capturedBlob),
+                metadata: {
+                    photoSource: 'camera'
+                }
+            };
 
-        // Trigger change event to show preview
-        const event = new Event('change', { bubbles: true });
-        imageInput.dispatchEvent(event);
+            // Store location metadata if available
+            if (capturedLocation) {
+                imageObj.metadata.photoLat = capturedLocation.latitude;
+                imageObj.metadata.photoLng = capturedLocation.longitude;
+                imageObj.metadata.photoAccuracy = capturedLocation.accuracy;
+            }
+
+            window.uploadedImages.push(imageObj);
+
+            // Trigger render
+            if (window.renderImagePreviews) {
+                window.renderImagePreviews();
+            }
+        } else {
+            // Fallback to old method
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            imageInput.files = dataTransfer.files;
+
+            const event = new Event('change', { bubbles: true });
+            imageInput.dispatchEvent(event);
+        }
 
         // Update location fields if we have location data
         if (capturedLocation && locationMarker && locationMap) {
@@ -1656,19 +1779,22 @@ function initLocationMap() {
             locationMarker.setLatLng([lat, lng]);
             locationMap.setView([lat, lng], 17);
             document.getElementById('location-coords').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-
-            // Store metadata for form submission
-            imageInput.dataset.photoLat = lat;
-            imageInput.dataset.photoLng = lng;
-            imageInput.dataset.photoAccuracy = capturedLocation.accuracy;
-            imageInput.dataset.photoSource = 'camera';
         }
 
         // Close modal
         closeCameraModal();
 
-        // Show success message
-        showStatus('success', 'Photo added successfully!');
+        // Show success message in a non-blocking way
+        setTimeout(() => {
+            const count = window.uploadedImages ? window.uploadedImages.length : 1;
+            console.log(`Photo added successfully! (${count}/5)`);
+        }, 100);
+    });
+
+    // Retry location button
+    retryLocationBtn.addEventListener('click', function() {
+        retryLocationBtn.classList.add('hidden');
+        getLocation();
     });
 
     // Close camera modal
@@ -1714,9 +1840,11 @@ function initLocationMap() {
         if (type === 'error') {
             locationStatus.style.backgroundColor = '#fef2f2';
             locationStatus.style.borderColor = '#fecaca';
+            retryLocationBtn.classList.remove('hidden'); // Show retry button on error
         } else if (type === 'success') {
             locationStatus.style.backgroundColor = '#f0fdf4';
             locationStatus.style.borderColor = '#bbf7d0';
+            retryLocationBtn.classList.add('hidden'); // Hide retry button on success
         }
     }
 
