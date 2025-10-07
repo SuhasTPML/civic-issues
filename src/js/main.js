@@ -432,14 +432,77 @@ function initLocationMap() {
         let currentFeatures = [];
         let currentSearchAbort = null; // AbortController for canceling stale searches
 
+        // Configuration constants
+        const RECENT_SEARCHES_KEY = 'recentLocationSearches';
+        const MAX_RECENT_SEARCHES = 5;
+        const IGNORED_OSM_IDS = new Set([1339408103, 459471357]);
+        const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org/search';
+
         // Fetch nearby features for the default Bangalore location on page load
         // Use a larger radius to get more features for searching across Bangalore
         setTimeout(() => {
             fetchAndDisplayNearbyFeatures(defaultLat, defaultLng, 2000); // 2km radius for better coverage
         }, 500);
 
-        // The geocoder variable is no longer used since we replaced with geocodeCity function
-        
+        // Geocoding helper using direct Nominatim API
+        async function geocodeCity(query, signal) {
+            const params = new URLSearchParams({
+                format: 'jsonv2',
+                q: query,
+                viewbox: '77.4602,13.1439,77.7845,12.8349',
+                bounded: '1',
+                countrycodes: 'in',
+                addressdetails: '1',
+                limit: '10'
+            });
+
+            const response = await fetch(`${NOMINATIM_BASE_URL}?${params.toString()}`, {
+                headers: {
+                    Accept: 'application/json',
+                    'Accept-Language': 'en'
+                },
+                signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`Nominatim error: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            return data.map((item) => ({
+                name: item.display_name.split(',')[0].trim(),
+                html: item.display_name,
+                center: L.latLng(parseFloat(item.lat), parseFloat(item.lon)),
+                raw: {
+                    id: item.osm_id,
+                    osm_type: item.osm_type,
+                    lat: parseFloat(item.lat),
+                    lng: parseFloat(item.lon)
+                },
+                properties: item
+            }));
+        }
+
+        // Check if a result should be ignored based on OSM ID
+        function isIgnoredResult(result) {
+            if (!result) {
+                return false;
+            }
+
+            const raw = result.raw || {};
+            const props = result.properties || {};
+            const candidateIds = [raw.id, raw.osm_id, props.osm_id]
+                .map((value) => Number(value))
+                .filter((value) => !Number.isNaN(value));
+
+            if (candidateIds.some((id) => IGNORED_OSM_IDS.has(id))) {
+                return true;
+            }
+
+            return IGNORED_OSM_IDS.has(result.id);
+        }
+
         // Hide suggestions function
         function hideSuggestions() {
             suggestionsContainer.classList.remove('show');
@@ -478,7 +541,10 @@ function initLocationMap() {
 
         // Render suggestions function with grouping
         function renderSuggestions(results) {
-            if (!results || results.length === 0) {
+            // Filter out ignored results first
+            const safeResults = results ? results.filter(r => !isIgnoredResult(r)) : [];
+
+            if (!safeResults || safeResults.length === 0) {
                 suggestionsContainer.innerHTML = `
                     <div class="no-results">
                         <p>No locations found in Bengaluru.</p>
@@ -489,9 +555,9 @@ function initLocationMap() {
                 return;
             }
 
-            // Group results by type
-            const nearbyResults = results.filter(r => r.raw && r.raw.id);
-            const geocoderResults = results.filter(r => !r.raw || !r.raw.id);
+            // Group safe results by type
+            const nearbyResults = safeResults.filter(r => r.raw && r.raw.id);
+            const geocoderResults = safeResults.filter(r => !r.raw || !r.raw.id);
 
             suggestionsContainer.innerHTML = '<ul></ul>';
             const ul = suggestionsContainer.querySelector('ul');
@@ -547,7 +613,13 @@ function initLocationMap() {
         
         // Select suggestion function
         function selectSuggestion(result) {
-            let lat, lng, name;
+            // Guard against ignored results
+            if (isIgnoredResult(result)) {
+                console.warn('Attempted to select ignored result:', result);
+                return;
+            }
+
+            let lat, lng, name, osmId;
 
             // Check if this is a nearby feature or a geocoder result
             if (result.raw && result.raw.id) {
@@ -556,11 +628,13 @@ function initLocationMap() {
                 lat = feature.lat;
                 lng = feature.lng;
                 name = feature.name;
+                osmId = feature.id;
             } else {
                 // This is a geocoder result
                 lat = result.center.lat;
                 lng = result.center.lng;
                 name = result.name;
+                osmId = result.raw?.id || result.properties?.osm_id || null;
             }
 
             // Update the marker and map
@@ -575,6 +649,9 @@ function initLocationMap() {
 
             // Refresh nearby features for the selected location
             fetchAndDisplayNearbyFeatures(lat, lng);
+
+            // Save to recent searches with osmId
+            saveRecentSearch({ name, lat, lng, osmId });
 
             hideSuggestions();
         }
@@ -932,72 +1009,7 @@ function initLocationMap() {
         // Overpass API helper
         const overpassCache = new Map();
         let lastQuery = { lat: null, lng: null, timestamp: 0 };
-        
-        let currentFeatures = [];
-        let currentSearchAbort = null; // AbortController for canceling stale searches
 
-        const RECENT_SEARCHES_KEY = 'recentLocationSearches';
-        const MAX_RECENT_SEARCHES = 5;
-        const IGNORED_OSM_IDS = new Set([1339408103, 459471357]);
-        const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org/search';
-
-        async function geocodeCity(query, signal) {
-            const params = new URLSearchParams({
-                format: 'jsonv2',
-                q: query,
-                viewbox: '77.4602,13.1439,77.7845,12.8349',
-                bounded: '1',
-                countrycodes: 'in',
-                addressdetails: '1',
-                limit: '10'
-            });
-
-            const response = await fetch(`${NOMINATIM_BASE_URL}?${params.toString()}`, {
-                headers: {
-                    Accept: 'application/json',
-                    'Accept-Language': 'en'
-                },
-                signal
-            });
-
-            if (!response.ok) {
-                throw new Error(`Nominatim error: ${response.status} ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            return data.map((item) => ({
-                name: item.display_name.split(',')[0].trim(),
-                html: item.display_name,
-                center: L.latLng(parseFloat(item.lat), parseFloat(item.lon)),
-                raw: {
-                    id: item.osm_id,
-                    osm_type: item.osm_type,
-                    lat: parseFloat(item.lat),
-                    lng: parseFloat(item.lon)
-                },
-                properties: item
-            }));
-        }
-
-        function isIgnoredResult(result) {
-            if (!result) {
-                return false;
-            }
-
-            const raw = result.raw || {};
-            const props = result.properties || {};
-            const candidateIds = [raw.id, raw.osm_id, props.osm_id]
-                .map((value) => Number(value))
-                .filter((value) => !Number.isNaN(value));
-
-            if (candidateIds.some((id) => IGNORED_OSM_IDS.has(id))) {
-                return true;
-            }
-
-            return IGNORED_OSM_IDS.has(result.id);
-        }
-        
         async function fetchNearbyFeatures(lat, lng, radius = 200, limit = 30) {
             // Create a cache key based on location and radius
             const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)},${radius}`;
@@ -1156,56 +1168,6 @@ function initLocationMap() {
             }
         }
         
-        // Function to render nearby features in the UI panel
-        function renderNearbyFeatures(features) {
-            const list = document.getElementById('nearby-features-list');
-            list.innerHTML = '';
-            
-            features.forEach((feature, index) => {
-                const li = document.createElement('li');
-                li.className = 'nearby-feature-item';
-                li.dataset.id = feature.id;
-                li.dataset.type = feature.type;
-                li.dataset.index = index; // For keyboard navigation
-                
-                // Calculate distance (simplified)
-                const markerPos = locationMarker.getLatLng();
-                const featurePos = L.latLng(feature.lat, feature.lng);
-                const distance = markerPos.distanceTo(featurePos);
-                const distanceText = distance < 1000 ? `${Math.round(distance)}m` : `${(distance/1000).toFixed(1)}km`;
-                
-                li.innerHTML = `
-                    <span class="feature-name">${feature.name}</span>
-                    <span class="feature-type">${feature.category} • ${distanceText}</span>
-                `;
-                
-                // Click handler to select the feature
-                li.addEventListener('click', () => {
-                    selectNearbyFeature(feature);
-                    // Clear the selected state from all items
-                    document.querySelectorAll('.nearby-feature-item').forEach(item => {
-                        item.classList.remove('selected');
-                    });
-                    // Add selected state to this item
-                    li.classList.add('selected');
-                });
-                
-                // Hover handler to highlight on the map
-                li.addEventListener('mouseenter', () => {
-                    highlightFeatureOnMap(feature);
-                });
-                
-                li.addEventListener('mouseleave', () => {
-                    removeFeatureHighlight();
-                });
-                
-                list.appendChild(li);
-            });
-            
-            // Add keyboard navigation to the list container
-            list.addEventListener('keydown', handleFeatureListNavigation);
-            list.setAttribute('tabindex', '0'); // Make the list focusable for keyboard events
-        }
         
         // Variable to track selected feature index for keyboard navigation
         let selectedFeatureIndex = -1;
@@ -1281,11 +1243,14 @@ function initLocationMap() {
 
         // Updated render function to store features
         function renderNearbyFeatures(features) {
-            currentFeatures = features; // Store for later use
+            // Filter out ignored OSM IDs
+            const filteredFeatures = features.filter(f => !IGNORED_OSM_IDS.has(f.id));
+            currentFeatures = filteredFeatures; // Store filtered features for search
+
             const list = document.getElementById('nearby-features-list');
             list.innerHTML = '';
-            
-            features.forEach((feature, index) => {
+
+            filteredFeatures.forEach((feature, index) => {
                 const li = document.createElement('li');
                 li.className = 'nearby-feature-item';
                 li.dataset.id = feature.id;
