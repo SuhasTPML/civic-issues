@@ -304,15 +304,15 @@ form button:hover {
 
 .location-suggestions {
     position: absolute;
-    z-index: 1000;
-    max-height: 200px;
+    z-index: 2000;
+    max-height: 300px;
     overflow-y: auto;
     background: white;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     width: calc(100% - 24px);
     margin-top: 5px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     display: none;
 }
 
@@ -350,6 +350,8 @@ form button:hover {
     border: 1px solid var(--border-color);
     border-radius: 4px;
     margin-top: 5px;
+    position: relative;
+    z-index: 1500;
 }
 
 .search-status.error {
