@@ -438,19 +438,7 @@ function initLocationMap() {
             fetchAndDisplayNearbyFeatures(defaultLat, defaultLng, 2000); // 2km radius for better coverage
         }, 500);
 
-        // Create a Nominatim geocoder instance scoped to Bengaluru
-        console.log('L.Control.Geocoder:', L.Control.Geocoder);
-        const geocoder = L.Control.Geocoder.nominatim({
-            geocodingQueryParams: {
-                // Bengaluru bounding box (SW_lng,SW_lat,NE_lng,NE_lat)
-                viewbox: '77.4602,12.8349,77.7845,13.1439',
-                bounded: 1, // Restrict results to viewbox
-                countrycodes: 'in', // Restrict to India
-                addressdetails: 1, // Get detailed address info
-                limit: 10 // Max results per query
-            }
-        });
-        console.log('Geocoder initialized with Bengaluru bounds:', geocoder);
+        // The geocoder variable is no longer used since we replaced with geocodeCity function
         
         // Hide suggestions function
         function hideSuggestions() {
@@ -631,27 +619,20 @@ function initLocationMap() {
                                 return;
                             }
 
-                            try {
-                                console.log('Calling geocoder.geocode...');
-                                geocoder.geocode(query, (results) => {
-                                    if (signal.aborted) {
-                                        console.log('Geocoder result arrived but search was aborted');
-                                        reject(new DOMException('Aborted', 'AbortError'));
-                                        return;
-                                    }
-                                    console.log('Geocoder callback fired, results:', results);
-                                    resolve(results || []);
-                                });
-
-                                // Abort listener
-                                signal.addEventListener('abort', () => {
-                                    console.log('Abort signal received');
+                            geocodeCity(query, signal).then((results) => {
+                                if (signal.aborted) {
                                     reject(new DOMException('Aborted', 'AbortError'));
-                                });
-                            } catch (error) {
-                                console.error('Geocoder error:', error);
-                                reject(error);
-                            }
+                                    return;
+                                }
+                                console.log('Geocoder results:', results);
+                                resolve(results || []);
+                            }).catch(error => {
+                                if (signal.aborted) {
+                                    reject(new DOMException('Aborted', 'AbortError'));
+                                } else {
+                                    reject(error);
+                                }
+                            });
                         }),
                         // Always search nearby features (they might already be loaded)
                         searchNearbyFeatures(query, signal)
@@ -700,6 +681,78 @@ function initLocationMap() {
             }, 300);
         });
         
+        function saveRecentSearch(entry) {
+            const { name, lat, lng, osmId } = entry;
+            if (!name || Number.isNaN(lat) || Number.isNaN(lng)) {
+                return;
+            }
+
+            let recent = getRecentSearches().filter((item) => item.name !== name);
+            recent.unshift({ name, lat, lng, osmId: osmId ?? null, timestamp: Date.now() });
+            recent = recent.slice(0, MAX_RECENT_SEARCHES);
+            localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recent));
+        }
+
+        function getRecentSearches() {
+            try {
+                return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]');
+            } catch (error) {
+                console.warn('Failed to read recent searches', error);
+                return [];
+            }
+        }
+
+        function clearRecentSearches() {
+            localStorage.removeItem(RECENT_SEARCHES_KEY);
+            hideSuggestions();
+        }
+
+        function renderRecentSearches(searches) {
+            if (!searches || searches.length === 0) {
+                hideSuggestions();
+                return;
+            }
+
+            suggestionsContainer.innerHTML = '<ul></ul>';
+            const ul = suggestionsContainer.querySelector('ul');
+
+            const header = document.createElement('li');
+            header.className = 'suggestion-header';
+            header.style.display = 'flex';
+            header.style.justifyContent = 'space-between';
+            header.style.alignItems = 'center';
+            header.innerHTML = `
+                <span>Recent Searches</span>
+                <button class="btn-link" type="button">Clear</button>
+            `;
+            const clearButton = header.querySelector('button');
+            clearButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                clearRecentSearches();
+            });
+            ul.appendChild(header);
+
+            searches.forEach((search, index) => {
+                const li = document.createElement('li');
+                li.dataset.index = index;
+                li.innerHTML = `
+                    <span class="suggestion-name">${search.name}</span>
+                    <span class="suggestion-detail">${search.lat.toFixed(4)}, ${search.lng.toFixed(4)}</span>
+                `;
+                li.__data = {
+                    name: search.name,
+                    center: L.latLng(search.lat, search.lng),
+                    raw: { id: search.osmId }
+                };
+                li.addEventListener('click', () => {
+                    selectSuggestion(li.__data);
+                });
+                ul.appendChild(li);
+            });
+
+            suggestionsContainer.classList.add('show');
+        }
+
         // Deduplicate results by comparing name and location
         function deduplicateResults(results) {
             const seen = new Map();
@@ -736,33 +789,27 @@ function initLocationMap() {
         }
 
         // Function to search through nearby features
-        function searchNearbyFeatures(query, signal = null) {
-            return new Promise((resolve, reject) => {
-                if (signal?.aborted) {
-                    reject(new DOMException('Aborted', 'AbortError'));
-                    return;
-                }
+        async function searchNearbyFeatures(query, signal = null) {
+            if (signal?.aborted) {
+                throw new DOMException('Aborted', 'AbortError');
+            }
 
-                console.log('Searching nearby features, currentFeatures:', currentFeatures);
-                // If we have current nearby features, search through them
-                if (currentFeatures && currentFeatures.length > 0) {
-                    const queryLower = query.toLowerCase();
-                    const matches = currentFeatures.filter(feature =>
-                        feature.name.toLowerCase().includes(queryLower) ||
-                        (feature.category && feature.category.toLowerCase().includes(queryLower))
-                    ).map(feature => ({
-                        name: feature.name,
-                        center: L.latLng(feature.lat, feature.lng),
-                        raw: feature // Store original feature data
-                    }));
+            // If we have current nearby features, search through them
+            if (currentFeatures && currentFeatures.length > 0) {
+                const queryLower = query.toLowerCase();
+                const matches = currentFeatures.filter(feature =>
+                    feature.name.toLowerCase().includes(queryLower) ||
+                    (feature.category && feature.category.toLowerCase().includes(queryLower))
+                ).map(feature => ({
+                    name: feature.name,
+                    center: L.latLng(feature.lat, feature.lng),
+                    raw: feature // Store original feature data
+                }));
 
-                    console.log('Nearby features matches:', matches);
-                    resolve(matches);
-                } else {
-                    console.log('No currentFeatures available');
-                    resolve([]);
-                }
-            });
+                return matches;
+            } else {
+                return [];
+            }
         }
         
         // Keyboard navigation
@@ -773,7 +820,19 @@ function initLocationMap() {
                 e.preventDefault();
                 if (suggestions.length === 0) {
                     // optional: trigger a search immediately using the current input
-                    geocoder.geocode(locationSearchInput.value.trim(), renderSuggestions);
+                    geocodeCity(locationSearchInput.value.trim(), new AbortController().signal)
+                        .then(results => {
+                            if (results && results.length > 0) {
+                                renderSuggestions(results);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Search failed:', error);
+                            const searchStatus = document.getElementById('search-status');
+                            searchStatus.textContent = 'Search failed. Please try again.';
+                            searchStatus.classList.add('error');
+                            searchStatus.classList.remove('hidden');
+                        });
                 } else if (selectedSuggestionIndex >= 0) {
                     const result = suggestions[selectedSuggestionIndex].__data;
                     if (result) selectSuggestion(result);
@@ -874,6 +933,71 @@ function initLocationMap() {
         const overpassCache = new Map();
         let lastQuery = { lat: null, lng: null, timestamp: 0 };
         
+        let currentFeatures = [];
+        let currentSearchAbort = null; // AbortController for canceling stale searches
+
+        const RECENT_SEARCHES_KEY = 'recentLocationSearches';
+        const MAX_RECENT_SEARCHES = 5;
+        const IGNORED_OSM_IDS = new Set([1339408103, 459471357]);
+        const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org/search';
+
+        async function geocodeCity(query, signal) {
+            const params = new URLSearchParams({
+                format: 'jsonv2',
+                q: query,
+                viewbox: '77.4602,13.1439,77.7845,12.8349',
+                bounded: '1',
+                countrycodes: 'in',
+                addressdetails: '1',
+                limit: '10'
+            });
+
+            const response = await fetch(`${NOMINATIM_BASE_URL}?${params.toString()}`, {
+                headers: {
+                    Accept: 'application/json',
+                    'Accept-Language': 'en'
+                },
+                signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`Nominatim error: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            return data.map((item) => ({
+                name: item.display_name.split(',')[0].trim(),
+                html: item.display_name,
+                center: L.latLng(parseFloat(item.lat), parseFloat(item.lon)),
+                raw: {
+                    id: item.osm_id,
+                    osm_type: item.osm_type,
+                    lat: parseFloat(item.lat),
+                    lng: parseFloat(item.lon)
+                },
+                properties: item
+            }));
+        }
+
+        function isIgnoredResult(result) {
+            if (!result) {
+                return false;
+            }
+
+            const raw = result.raw || {};
+            const props = result.properties || {};
+            const candidateIds = [raw.id, raw.osm_id, props.osm_id]
+                .map((value) => Number(value))
+                .filter((value) => !Number.isNaN(value));
+
+            if (candidateIds.some((id) => IGNORED_OSM_IDS.has(id))) {
+                return true;
+            }
+
+            return IGNORED_OSM_IDS.has(result.id);
+        }
+        
         async function fetchNearbyFeatures(lat, lng, radius = 200, limit = 30) {
             // Create a cache key based on location and radius
             const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)},${radius}`;
@@ -935,31 +1059,36 @@ function initLocationMap() {
                 const data = await response.json();
                 
                 // Normalize the response
-                const normalizedResults = data.elements.map(element => {
-                    // Skip features that are roads, buildings, or specific ignored nodes
-                    if (element.tags.highway || element.tags.building) {
-                        return null; // Mark for filtering
-                    }
-                    
-                    // Skip the specific node and any nodes with the same structure/type
-                    // If you can provide specific tags that identify this structure, 
-                    // we can filter by those instead of just the ID
-                    if (element.type === 'node' && element.id === 459471357) {
-                        return null; // Mark for filtering
-                    }
-                    
-                    return {
-                        id: element.id,
-                        type: element.type,
-                        lat: element.center ? element.center.lat : element.lat,
-                        lng: element.center ? element.center.lon : element.lon,
-                        name: element.tags.name || `${element.type} #${element.id}`,
-                        category: element.tags.amenity || element.tags.shop || element.tags.tourism || 
-                                 element.tags.leisure || element.tags.healthcare || element.tags.office ||
-                                 element.tags.emergency || element.tags.public_transport || 'other',
-                        rawTags: element.tags
-                    };
-                }).filter(feature => feature !== null); // Remove null entries
+                const normalizedResults = data.elements
+                    .map((element) => {
+                        if (element.tags.highway || element.tags.building) {
+                            return null;
+                        }
+
+                        if (IGNORED_OSM_IDS.has(element.id)) {
+                            return null;
+                        }
+
+                        return {
+                            id: element.id,
+                            type: element.type,
+                            lat: element.center ? element.center.lat : element.lat,
+                            lng: element.center ? element.center.lon : element.lon,
+                            name: element.tags.name || `${element.type} #${element.id}`,
+                            category:
+                                element.tags.amenity ||
+                                element.tags.shop ||
+                                element.tags.tourism ||
+                                element.tags.leisure ||
+                                element.tags.healthcare ||
+                                element.tags.office ||
+                                element.tags.emergency ||
+                                element.tags.public_transport ||
+                                'other',
+                            rawTags: element.tags
+                        };
+                    })
+                    .filter((feature) => feature !== null);
                 
                 // Cache the results
                 overpassCache.set(cacheKey, {
