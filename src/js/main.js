@@ -170,36 +170,36 @@ function initFormHandling() {
         const category = document.getElementById('category').value;
         const title = document.getElementById('title').value;
         const description = document.getElementById('description').value;
-        const location = document.getElementById('location-coords').value; // Use coordinates field
-        const imageInput = document.getElementById('image');
-        const image = imageInput.files[0];
+        const location = document.getElementById('location-coords').value;
+        const imageErrorDiv = document.getElementById('image-error');
 
-        // Validate required fields (simplified)
+        // Validate required fields
         if (!category || !title || !description || !location || location.trim() === '') {
             alert('Please fill in all required fields and select a location on the map');
             return;
         }
 
-        // Create a draft submission object
+        // Validate images using uploadedImages array (mobile-compatible)
+        if (!uploadedImages || uploadedImages.length === 0) {
+            imageErrorDiv.classList.remove('hidden');
+            imageErrorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+        imageErrorDiv.classList.add('hidden');
+
+        // Create a draft submission object with multiple images
         const draftSubmission = {
             id: 'draft_' + Date.now(),
             category,
             title,
             description,
             location,
-            image: image ? URL.createObjectURL(image) : null,
+            images: uploadedImages.map(img => ({
+                dataUrl: img.dataUrl,
+                metadata: img.metadata
+            })),
             createdAt: new Date().toISOString()
         };
-
-        // Add photo metadata if available (from camera capture)
-        if (imageInput.dataset.photoSource) {
-            draftSubmission.photo_metadata = {
-                source: imageInput.dataset.photoSource,
-                latitude: imageInput.dataset.photoLat,
-                longitude: imageInput.dataset.photoLng,
-                accuracy: imageInput.dataset.photoAccuracy
-            };
-        }
 
         // Save draft to localStorage
         saveDraftToLocalStorage(draftSubmission);
@@ -330,12 +330,26 @@ function initFormHandling() {
     }
 
     // Update the file input to reflect current uploaded images
+    // Guard for mobile browsers that don't support DataTransfer constructor
     function updateFileInput() {
-        const dataTransfer = new DataTransfer();
-        uploadedImages.forEach(imgObj => {
-            dataTransfer.items.add(imgObj.file);
-        });
-        document.getElementById('image').files = dataTransfer.files;
+        // Check if DataTransfer is supported (iOS Safari and some Android WebViews don't support it)
+        if (typeof DataTransfer === 'undefined' || typeof DataTransfer !== 'function') {
+            console.log('DataTransfer not supported, using uploadedImages array directly');
+            return; // Skip file input update, form submission will use uploadedImages array
+        }
+
+        try {
+            const dataTransfer = new DataTransfer();
+            uploadedImages.forEach(imgObj => {
+                dataTransfer.items.add(imgObj.file);
+            });
+            const imageInput = document.getElementById('image');
+            imageInput.files = dataTransfer.files;
+        } catch (err) {
+            // If DataTransfer fails (mobile browsers), just log and continue
+            console.log('DataTransfer update failed, using uploadedImages array instead:', err.message);
+            // Form submission will serialize uploadedImages directly
+        }
     }
 
     // Expose to window for camera capture integration
@@ -1763,13 +1777,37 @@ function initLocationMap() {
                 window.renderImagePreviews();
             }
         } else {
-            // Fallback to old method
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            imageInput.files = dataTransfer.files;
+            // Fallback: Initialize uploadedImages if not available
+            console.warn('uploadedImages not found, initializing...');
+            if (!window.uploadedImages) {
+                window.uploadedImages = [];
+            }
 
-            const event = new Event('change', { bubbles: true });
-            imageInput.dispatchEvent(event);
+            const imageObj = {
+                file: file,
+                dataUrl: URL.createObjectURL(capturedBlob),
+                metadata: {
+                    photoSource: 'camera'
+                }
+            };
+
+            if (capturedLocation) {
+                imageObj.metadata.photoLat = capturedLocation.latitude;
+                imageObj.metadata.photoLng = capturedLocation.longitude;
+                imageObj.metadata.photoAccuracy = capturedLocation.accuracy;
+            }
+
+            window.uploadedImages.push(imageObj);
+
+            // Create basic preview if renderImagePreviews doesn't exist
+            const previewDiv = document.getElementById('image-preview');
+            if (previewDiv) {
+                const img = document.createElement('img');
+                img.src = imageObj.dataUrl;
+                img.style.maxWidth = '200px';
+                img.style.marginTop = '10px';
+                previewDiv.appendChild(img);
+            }
         }
 
         // Update location fields if we have location data

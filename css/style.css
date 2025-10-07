@@ -955,6 +955,17 @@ footer p {
     font-family: 'Roboto Slab', serif;
 }
 
+.field-error {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-family: 'Roboto Slab', serif;
+}
+
 .image-preview-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
