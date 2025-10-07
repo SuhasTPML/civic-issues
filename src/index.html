@@ -87,10 +87,26 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="location">Location *</label>
-                    <input type="text" id="location" placeholder="Enter location or drag marker on map" required>
+                    <label for="location-search">Search Location</label>
+                    <input type="text" id="location-search" placeholder="Search for a place..." required>
                     <div id="location-suggestions" class="location-suggestions"></div>
-                    <div id="location-map"></div>
+                    <label for="location-coords" style="margin-top: 10px;">Coordinates (not editable)</label>
+                    <input type="text" id="location-coords" placeholder="Coordinates will appear here after selecting a location" readonly>
+                    <div class="map-container">
+                        <div id="location-map"></div>
+                        <div id="nearby-features-panel" class="nearby-features-panel">
+                            <div id="nearby-features-header" class="nearby-features-header">
+                                <h4>Nearby Features</h4>
+                                <button id="refresh-nearby" title="Refresh nearby features">🔄</button>
+                            </div>
+                            <div id="nearby-features-content" class="nearby-features-content">
+                                <div id="nearby-loading" class="loading hidden">Loading nearby features...</div>
+                                <div id="nearby-error" class="error hidden"></div>
+                                <ul id="nearby-features-list" class="nearby-features-list"></ul>
+                                <button id="load-more-nearby" class="load-more-btn hidden">Load More</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
