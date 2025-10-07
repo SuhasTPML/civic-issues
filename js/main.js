@@ -1491,7 +1491,7 @@ function initLocationMap() {
         }
     }
 
-    // Get user location
+    // Get user location with fallback strategy
     function getLocation() {
         if (!navigator.geolocation) {
             showLocationStatus('error', 'Geolocation not supported');
@@ -1499,45 +1499,81 @@ function initLocationMap() {
         }
 
         locationStatus.classList.remove('hidden');
-        locationText.textContent = 'Getting location...';
+        locationText.textContent = 'Getting precise location...';
 
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                const accuracy = position.coords.accuracy;
+        // Success handler
+        function handleSuccess(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
 
-                // Check if location is within Bengaluru
-                if (!isWithinBengaluru(lat, lng)) {
-                    showLocationStatus('error', '⚠️ Location outside Bengaluru city limits');
-                    capturedLocation = null;
-                    return;
-                }
-
-                capturedLocation = {
-                    latitude: lat,
-                    longitude: lng,
-                    accuracy: accuracy
-                };
-
-                showLocationStatus('success', `📍 Location acquired (±${Math.round(accuracy)}m accuracy)`);
-            },
-            function(error) {
-                let errorMsg = 'Location access denied';
-                if (error.code === 1) {
-                    errorMsg = 'Location permission denied';
-                } else if (error.code === 2) {
-                    errorMsg = 'Location unavailable';
-                } else if (error.code === 3) {
-                    errorMsg = 'Location timeout';
-                }
-                showLocationStatus('error', '⚠️ ' + errorMsg);
+            // Check if location is within Bengaluru
+            if (!isWithinBengaluru(lat, lng)) {
+                showLocationStatus('error', 'Location outside Bengaluru city limits');
                 capturedLocation = null;
-            },
+                return;
+            }
+
+            capturedLocation = {
+                latitude: lat,
+                longitude: lng,
+                accuracy: accuracy
+            };
+
+            const accuracyText = accuracy < 50 ? 'High accuracy' : accuracy < 200 ? 'Medium accuracy' : 'Low accuracy';
+            showLocationStatus('success', `Location acquired - ${accuracyText} (±${Math.round(accuracy)}m)`);
+        }
+
+        // Error handler with fallback
+        function handleError(error) {
+            let errorMsg = 'Location access denied';
+
+            if (error.code === 1) {
+                // Permission denied
+                errorMsg = 'Location permission denied. Please enable location access in your browser settings.';
+                showLocationStatus('error', errorMsg);
+                capturedLocation = null;
+            } else if (error.code === 2) {
+                // Position unavailable
+                errorMsg = 'Location unavailable. Please check your device location settings.';
+                showLocationStatus('error', errorMsg);
+                capturedLocation = null;
+            } else if (error.code === 3) {
+                // Timeout - try again with lower accuracy for faster result
+                console.log('High-accuracy timeout, retrying with network location...');
+                locationText.textContent = 'Getting approximate location...';
+
+                navigator.geolocation.getCurrentPosition(
+                    handleSuccess,
+                    function(fallbackError) {
+                        // Final fallback failed
+                        if (fallbackError.code === 1) {
+                            errorMsg = 'Location permission denied';
+                        } else if (fallbackError.code === 2) {
+                            errorMsg = 'Location unavailable';
+                        } else {
+                            errorMsg = 'Unable to get location. You can manually select location on the map.';
+                        }
+                        showLocationStatus('error', errorMsg);
+                        capturedLocation = null;
+                    },
+                    {
+                        enableHighAccuracy: false, // Use network location (faster)
+                        timeout: 15000,
+                        maximumAge: 300000 // Accept cached position up to 5 minutes old
+                    }
+                );
+            }
+        }
+
+        // First attempt: High accuracy with generous timeout
+        navigator.geolocation.getCurrentPosition(
+            handleSuccess,
+            handleError,
             {
                 enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
+                timeout: 30000, // 30 seconds for high-accuracy GPS
+                maximumAge: 60000 // Accept cached position up to 1 minute old
             }
         );
     }
