@@ -112,10 +112,15 @@
                 
                 <div class="form-group">
                     <label for="image">Image *</label>
-                    <input type="file" id="image" accept="image/*" required>
+                    <div class="image-input-wrapper">
+                        <input type="file" id="image" accept="image/*" required>
+                        <button type="button" id="capture-photo-btn" class="btn-secondary">
+                            📷 Capture Photo
+                        </button>
+                    </div>
                     <div id="image-preview"></div>
                 </div>
-                
+
                 <div class="form-group">
                     <label class="checkbox-container">
                         <input type="checkbox" id="consent" required>
@@ -123,10 +128,60 @@
                         I agree this info may be published by Deccan Herald
                     </label>
                 </div>
-                
+
                 <button type="submit">Continue</button>
             </form>
-            
+
+            <!-- Camera Permission Consent Dialog -->
+            <div id="camera-consent-dialog" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Camera & Location Permission</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>We need your permission to:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            <li>📷 Access your camera to capture photos</li>
+                            <li>📍 Access your location to tag the issue accurately</li>
+                        </ul>
+                        <p style="margin-top: 15px; font-size: 0.9rem; color: var(--secondary-color);">
+                            Your photo and location will only be used for this issue report.
+                            Location data is stored separately and is not embedded in the photo.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="deny-camera" class="btn-secondary">Cancel</button>
+                        <button type="button" id="allow-camera" class="btn-primary">Allow & Continue</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Camera Capture Modal -->
+            <div id="camera-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Capture Photo</h3>
+                        <button type="button" id="close-camera" class="btn-close">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="camera-status" class="status-message hidden"></div>
+                        <video id="camera-preview" autoplay playsinline></video>
+                        <canvas id="capture-canvas" style="display:none;"></canvas>
+                        <div id="captured-preview" class="hidden">
+                            <img id="captured-image" alt="Captured photo">
+                        </div>
+                        <div id="location-status" class="location-info hidden">
+                            <span class="location-icon">📍</span>
+                            <span id="location-text">Getting location...</span>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="retake-photo" class="btn-secondary hidden">Retake</button>
+                        <button type="button" id="use-photo" class="btn-primary hidden">Use Photo</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Preview Card (shown after form submission, before login) -->
             <div id="preview-card" class="preview-card hidden">
                 <h3>Issue Preview</h3>

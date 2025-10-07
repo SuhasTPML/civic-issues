@@ -98,15 +98,45 @@ app.get('/api/issues/:id', async (req, res) => {
 // Create a new issue
 app.post('/api/issues', upload.single('image'), async (req, res) => {
     try {
-        const { category, title, description, location, user_id } = req.body;
-        
+        const {
+            category,
+            title,
+            description,
+            location,
+            user_id,
+            photo_source,
+            photo_lat,
+            photo_lng,
+            photo_accuracy
+        } = req.body;
+
         // Validate required fields
         if (!category || !title || !description || !location) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
-        
+
+        // Validate location coordinates are within Bengaluru bounds
+        const locationCoords = location.split(',').map(c => parseFloat(c.trim()));
+        if (locationCoords.length === 2) {
+            const [lat, lng] = locationCoords;
+            const BENGALURU_BOUNDS = {
+                north: 13.1439,
+                south: 12.8349,
+                east: 77.7845,
+                west: 77.4602
+            };
+
+            if (lat < BENGALURU_BOUNDS.south || lat > BENGALURU_BOUNDS.north ||
+                lng < BENGALURU_BOUNDS.west || lng > BENGALURU_BOUNDS.east) {
+                return res.status(400).json({
+                    error: 'Location must be within Bengaluru city limits',
+                    bounds: BENGALURU_BOUNDS
+                });
+            }
+        }
+
         const issues = await readIssues();
-        
+
         // Create new issue
         const newIssue = {
             id: Date.now(), // Simple ID generation for MVP
@@ -119,15 +149,47 @@ app.post('/api/issues', upload.single('image'), async (req, res) => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
-        
+
         // Add image URL if file was uploaded
         if (req.file) {
             newIssue.image_url = `/uploads/${req.file.filename}`;
         }
-        
+
+        // Add photo metadata if provided
+        if (photo_source) {
+            newIssue.photo_metadata = {
+                source: photo_source, // 'camera' or 'upload'
+                captured_at: new Date().toISOString()
+            };
+
+            // Add location data if photo was captured with camera
+            if (photo_source === 'camera' && photo_lat && photo_lng) {
+                newIssue.photo_metadata.location = {
+                    latitude: parseFloat(photo_lat),
+                    longitude: parseFloat(photo_lng),
+                    accuracy: photo_accuracy ? parseFloat(photo_accuracy) : null
+                };
+
+                // Validate photo location is within Bengaluru
+                const photoLat = parseFloat(photo_lat);
+                const photoLng = parseFloat(photo_lng);
+                const BENGALURU_BOUNDS = {
+                    north: 13.1439,
+                    south: 12.8349,
+                    east: 77.7845,
+                    west: 77.4602
+                };
+
+                if (photoLat < BENGALURU_BOUNDS.south || photoLat > BENGALURU_BOUNDS.north ||
+                    photoLng < BENGALURU_BOUNDS.west || photoLng > BENGALURU_BOUNDS.east) {
+                    newIssue.photo_metadata.location_warning = 'Photo location outside Bengaluru bounds';
+                }
+            }
+        }
+
         issues.push(newIssue);
         await writeIssues(issues);
-        
+
         res.status(201).json(newIssue);
     } catch (error) {
         console.error('Error creating issue:', error);

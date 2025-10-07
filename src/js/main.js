@@ -165,20 +165,21 @@ function initFormHandling() {
     
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
         // Get form data
         const category = document.getElementById('category').value;
         const title = document.getElementById('title').value;
         const description = document.getElementById('description').value;
         const location = document.getElementById('location-coords').value; // Use coordinates field
-        const image = document.getElementById('image').files[0];
-        
+        const imageInput = document.getElementById('image');
+        const image = imageInput.files[0];
+
         // Validate required fields (simplified)
         if (!category || !title || !description || !location || location.trim() === '') {
             alert('Please fill in all required fields and select a location on the map');
             return;
         }
-        
+
         // Create a draft submission object
         const draftSubmission = {
             id: 'draft_' + Date.now(),
@@ -189,13 +190,23 @@ function initFormHandling() {
             image: image ? URL.createObjectURL(image) : null,
             createdAt: new Date().toISOString()
         };
-        
+
+        // Add photo metadata if available (from camera capture)
+        if (imageInput.dataset.photoSource) {
+            draftSubmission.photo_metadata = {
+                source: imageInput.dataset.photoSource,
+                latitude: imageInput.dataset.photoLat,
+                longitude: imageInput.dataset.photoLng,
+                accuracy: imageInput.dataset.photoAccuracy
+            };
+        }
+
         // Save draft to localStorage
         saveDraftToLocalStorage(draftSubmission);
-        
+
         // Show preview card with draft data
         showPreviewCard(draftSubmission);
-        
+
         // Hide form and show preview
         form.classList.add('hidden');
         previewCard.classList.remove('hidden');
@@ -1368,9 +1379,321 @@ function initLocationMap() {
             locationMarker.setLatLng(e.latlng);
             const { lat, lng } = e.latlng;
             locationCoordsInput.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            
+
             // Debounced fetch to avoid flooding the API
             debouncedFetchNearby(lat, lng);
         });
     }
 }
+
+// Camera Capture Functionality
+(function initCameraCapture() {
+    // DOM Elements
+    const capturePhotoBtn = document.getElementById('capture-photo-btn');
+    const cameraConsentDialog = document.getElementById('camera-consent-dialog');
+    const allowCameraBtn = document.getElementById('allow-camera');
+    const denyCameraBtn = document.getElementById('deny-camera');
+    const cameraModal = document.getElementById('camera-modal');
+    const closeCameraBtn = document.getElementById('close-camera');
+    const cameraPreview = document.getElementById('camera-preview');
+    const captureCanvas = document.getElementById('capture-canvas');
+    const capturedPreview = document.getElementById('captured-preview');
+    const capturedImage = document.getElementById('captured-image');
+    const retakePhotoBtn = document.getElementById('retake-photo');
+    const usePhotoBtn = document.getElementById('use-photo');
+    const cameraStatus = document.getElementById('camera-status');
+    const locationStatus = document.getElementById('location-status');
+    const locationText = document.getElementById('location-text');
+    const imageInput = document.getElementById('image');
+    const imagePreview = document.getElementById('image-preview');
+
+    // State variables
+    let stream = null;
+    let capturedBlob = null;
+    let capturedLocation = null;
+
+    // Constants
+    const BENGALURU_BOUNDS = {
+        north: 13.1439,
+        south: 12.8349,
+        east: 77.7845,
+        west: 77.4602
+    };
+
+    // Check if coordinate is within Bengaluru bounds
+    function isWithinBengaluru(lat, lng) {
+        return lat >= BENGALURU_BOUNDS.south &&
+               lat <= BENGALURU_BOUNDS.north &&
+               lng >= BENGALURU_BOUNDS.west &&
+               lng <= BENGALURU_BOUNDS.east;
+    }
+
+    // Show consent dialog when capture button is clicked
+    capturePhotoBtn.addEventListener('click', function() {
+        cameraConsentDialog.classList.remove('hidden');
+    });
+
+    // Handle consent denial
+    denyCameraBtn.addEventListener('click', function() {
+        cameraConsentDialog.classList.add('hidden');
+    });
+
+    // Handle consent approval
+    allowCameraBtn.addEventListener('click', async function() {
+        cameraConsentDialog.classList.add('hidden');
+        await openCameraModal();
+    });
+
+    // Open camera modal and request permissions
+    async function openCameraModal() {
+        cameraModal.classList.remove('hidden');
+        cameraStatus.classList.add('hidden');
+        locationStatus.classList.add('hidden');
+        capturedPreview.classList.add('hidden');
+        cameraPreview.style.display = 'block';
+        retakePhotoBtn.classList.add('hidden');
+        usePhotoBtn.classList.add('hidden');
+
+        try {
+            // Request camera permission
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+            cameraPreview.srcObject = stream;
+
+            // Start getting location
+            getLocation();
+
+            // Show capture button after camera is ready
+            cameraPreview.addEventListener('loadedmetadata', function() {
+                // Create capture button if it doesn't exist
+                let captureBtn = document.getElementById('capture-btn');
+                if (!captureBtn) {
+                    captureBtn = document.createElement('button');
+                    captureBtn.id = 'capture-btn';
+                    captureBtn.className = 'btn-primary';
+                    captureBtn.textContent = 'Capture Photo';
+                    captureBtn.type = 'button';
+                    captureBtn.style.marginTop = '15px';
+                    captureBtn.style.width = '100%';
+
+                    captureBtn.addEventListener('click', capturePhoto);
+
+                    const modalBody = cameraModal.querySelector('.modal-body');
+                    modalBody.appendChild(captureBtn);
+                }
+                captureBtn.style.display = 'block';
+            });
+
+        } catch (err) {
+            showStatus('error', 'Camera access denied or not available: ' + err.message);
+            console.error('Camera error:', err);
+        }
+    }
+
+    // Get user location
+    function getLocation() {
+        if (!navigator.geolocation) {
+            showLocationStatus('error', 'Geolocation not supported');
+            return;
+        }
+
+        locationStatus.classList.remove('hidden');
+        locationText.textContent = 'Getting location...';
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+
+                // Check if location is within Bengaluru
+                if (!isWithinBengaluru(lat, lng)) {
+                    showLocationStatus('error', '⚠️ Location outside Bengaluru city limits');
+                    capturedLocation = null;
+                    return;
+                }
+
+                capturedLocation = {
+                    latitude: lat,
+                    longitude: lng,
+                    accuracy: accuracy
+                };
+
+                showLocationStatus('success', `📍 Location acquired (±${Math.round(accuracy)}m accuracy)`);
+            },
+            function(error) {
+                let errorMsg = 'Location access denied';
+                if (error.code === 1) {
+                    errorMsg = 'Location permission denied';
+                } else if (error.code === 2) {
+                    errorMsg = 'Location unavailable';
+                } else if (error.code === 3) {
+                    errorMsg = 'Location timeout';
+                }
+                showLocationStatus('error', '⚠️ ' + errorMsg);
+                capturedLocation = null;
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    }
+
+    // Capture photo from video stream
+    function capturePhoto() {
+        const context = captureCanvas.getContext('2d');
+        captureCanvas.width = cameraPreview.videoWidth;
+        captureCanvas.height = cameraPreview.videoHeight;
+
+        // Draw the current frame
+        context.drawImage(cameraPreview, 0, 0);
+
+        // Convert to blob
+        captureCanvas.toBlob(function(blob) {
+            capturedBlob = blob;
+
+            // Show preview
+            const url = URL.createObjectURL(blob);
+            capturedImage.src = url;
+
+            // Update UI
+            cameraPreview.style.display = 'none';
+            capturedPreview.classList.remove('hidden');
+            document.getElementById('capture-btn').style.display = 'none';
+            retakePhotoBtn.classList.remove('hidden');
+            usePhotoBtn.classList.remove('hidden');
+
+            // Stop camera stream
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+        }, 'image/jpeg', 0.9);
+    }
+
+    // Retake photo
+    retakePhotoBtn.addEventListener('click', async function() {
+        capturedBlob = null;
+        capturedLocation = null;
+        capturedPreview.classList.add('hidden');
+        await openCameraModal();
+    });
+
+    // Use captured photo
+    usePhotoBtn.addEventListener('click', function() {
+        if (!capturedBlob) {
+            showStatus('error', 'No photo captured');
+            return;
+        }
+
+        // Validate location
+        if (!capturedLocation) {
+            const confirmWithoutLocation = confirm(
+                'Warning: Location was not captured or is outside Bengaluru.\n\n' +
+                'You can still use this photo, but you will need to manually select the location on the map.\n\n' +
+                'Continue?'
+            );
+            if (!confirmWithoutLocation) {
+                return;
+            }
+        }
+
+        // Create a File object from the blob
+        const file = new File([capturedBlob], `civic-issue-${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+        // Create a DataTransfer to set the file input
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        imageInput.files = dataTransfer.files;
+
+        // Trigger change event to show preview
+        const event = new Event('change', { bubbles: true });
+        imageInput.dispatchEvent(event);
+
+        // Update location fields if we have location data
+        if (capturedLocation && locationMarker && locationMap) {
+            const lat = capturedLocation.latitude;
+            const lng = capturedLocation.longitude;
+            locationMarker.setLatLng([lat, lng]);
+            locationMap.setView([lat, lng], 17);
+            document.getElementById('location-coords').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+            // Store metadata for form submission
+            imageInput.dataset.photoLat = lat;
+            imageInput.dataset.photoLng = lng;
+            imageInput.dataset.photoAccuracy = capturedLocation.accuracy;
+            imageInput.dataset.photoSource = 'camera';
+        }
+
+        // Close modal
+        closeCameraModal();
+
+        // Show success message
+        showStatus('success', 'Photo added successfully!');
+    });
+
+    // Close camera modal
+    closeCameraBtn.addEventListener('click', closeCameraModal);
+
+    function closeCameraModal() {
+        cameraModal.classList.add('hidden');
+
+        // Stop camera stream if still active
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+
+        // Reset state
+        capturedBlob = null;
+        capturedLocation = null;
+        capturedPreview.classList.add('hidden');
+        cameraPreview.style.display = 'block';
+        const captureBtn = document.getElementById('capture-btn');
+        if (captureBtn) {
+            captureBtn.style.display = 'none';
+        }
+    }
+
+    // Show status message in camera modal
+    function showStatus(type, message) {
+        cameraStatus.textContent = message;
+        cameraStatus.className = 'status-message ' + type;
+        cameraStatus.classList.remove('hidden');
+
+        // Auto-hide after 5 seconds for success messages
+        if (type === 'success') {
+            setTimeout(() => {
+                cameraStatus.classList.add('hidden');
+            }, 5000);
+        }
+    }
+
+    // Show location status
+    function showLocationStatus(type, message) {
+        locationText.textContent = message;
+        if (type === 'error') {
+            locationStatus.style.backgroundColor = '#fef2f2';
+            locationStatus.style.borderColor = '#fecaca';
+        } else if (type === 'success') {
+            locationStatus.style.backgroundColor = '#f0fdf4';
+            locationStatus.style.borderColor = '#bbf7d0';
+        }
+    }
+
+    // Close modal when clicking outside
+    cameraModal.addEventListener('click', function(e) {
+        if (e.target === cameraModal) {
+            closeCameraModal();
+        }
+    });
+
+    cameraConsentDialog.addEventListener('click', function(e) {
+        if (e.target === cameraConsentDialog) {
+            cameraConsentDialog.classList.add('hidden');
+        }
+    });
+})();
