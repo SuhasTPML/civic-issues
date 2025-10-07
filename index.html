@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bengaluru Civic Issues Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto+Slab:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Bengaluru Civic Issues Hub</h1>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active" data-view="map">Map View</a></li>
+                    <li><a href="#" data-view="list">List View</a></li>
+                    <li><a href="#" data-view="submit">Report Issue</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Map View -->
+        <section id="map-view" class="view active">
+            <div id="map"></div>
+            <div class="stats">
+                <p>Total submitted: <span id="total-submitted">0</span> | 
+                   Published: <span id="total-published">0</span> | 
+                   Resolved: <span id="total-resolved">0</span></p>
+            </div>
+        </section>
+
+        <!-- List View -->
+        <section id="list-view" class="view">
+            <div class="filters">
+                <select id="category-filter">
+                    <option value="">All Categories</option>
+                    <option value="Roads">Roads</option>
+                    <option value="Water">Water</option>
+                    <option value="Waste">Waste</option>
+                    <option value="Power">Power</option>
+                    <option value="Public Health">Public Health</option>
+                    <option value="Others">Others</option>
+                </select>
+                <select id="status-filter">
+                    <option value="">All Statuses</option>
+                    <option value="New">New</option>
+                    <option value="Verified">Verified</option>
+                    <option value="Published">Published</option>
+                    <option value="Resolved">Resolved</option>
+                </select>
+                <input type="text" id="location-filter" placeholder="Filter by location...">
+            </div>
+            <div id="issues-list"></div>
+        </section>
+
+        <!-- Report Issue Form -->
+        <section id="submit-view" class="view">
+            <h2>Report a Civic Issue</h2>
+            <form id="civic-issue-form">
+                <div class="form-group">
+                    <label for="category">Category *</label>
+                    <select id="category" required>
+                        <option value="">Select Category</option>
+                        <option value="Roads">Roads</option>
+                        <option value="Water">Water</option>
+                        <option value="Waste">Waste</option>
+                        <option value="Power">Power</option>
+                        <option value="Public Health">Public Health</option>
+                        <option value="Others">Others</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="title">Title (≤100 chars) *</label>
+                    <input type="text" id="title" maxlength="100" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description (≤250 chars) *</label>
+                    <textarea id="description" maxlength="250" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="location-search">Search Location</label>
+                    <input type="text" id="location-search" placeholder="Search entire city... (min 3 characters)" required>
+                    <div id="location-suggestions" class="location-suggestions"></div>
+                    <div id="search-status" class="search-status hidden"></div>
+                    <label for="location-coords" style="margin-top: 10px;">Coordinates (not editable)</label>
+                    <input type="text" id="location-coords" placeholder="Coordinates will appear here after selecting a location" readonly>
+                    <div class="map-container">
+                        <div id="location-map"></div>
+                        <div id="nearby-features-panel" class="nearby-features-panel">
+                            <div id="nearby-features-header" class="nearby-features-header">
+                                <h4>Nearby Features</h4>
+                                <button id="refresh-nearby" title="Refresh nearby features">🔄</button>
+                            </div>
+                            <div id="nearby-features-content" class="nearby-features-content">
+                                <div id="nearby-loading" class="loading hidden">Loading nearby features...</div>
+                                <div id="nearby-error" class="error hidden"></div>
+                                <ul id="nearby-features-list" class="nearby-features-list"></ul>
+                                <button id="load-more-nearby" class="load-more-btn hidden">Load More</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="image">Image *</label>
+                    <div class="image-input-wrapper">
+                        <input type="file" id="image" accept="image/*" required>
+                        <button type="button" id="capture-photo-btn" class="btn-secondary">
+                            📷 Capture Photo
+                        </button>
+                    </div>
+                    <div id="image-preview"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="consent" required>
+                        <span class="checkmark"></span>
+                        I agree this info may be published by Deccan Herald
+                    </label>
+                </div>
+
+                <button type="submit">Continue</button>
+            </form>
+
+            <!-- Camera Permission Consent Dialog -->
+            <div id="camera-consent-dialog" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Camera & Location Permission</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>We need your permission to:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            <li>📷 Access your camera to capture photos</li>
+                            <li>📍 Access your location to tag the issue accurately</li>
+                        </ul>
+                        <p style="margin-top: 15px; font-size: 0.9rem; color: var(--secondary-color);">
+                            Your photo and location will only be used for this issue report.
+                            Location data is stored separately and is not embedded in the photo.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="deny-camera" class="btn-secondary">Cancel</button>
+                        <button type="button" id="allow-camera" class="btn-primary">Allow & Continue</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Camera Capture Modal -->
+            <div id="camera-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Capture Photo</h3>
+                        <button type="button" id="close-camera" class="btn-close">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="camera-status" class="status-message hidden"></div>
+                        <video id="camera-preview" autoplay playsinline></video>
+                        <canvas id="capture-canvas" style="display:none;"></canvas>
+                        <div id="captured-preview" class="hidden">
+                            <img id="captured-image" alt="Captured photo">
+                        </div>
+                        <div id="location-status" class="location-info hidden">
+                            <span class="location-icon">📍</span>
+                            <span id="location-text">Getting location...</span>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="retake-photo" class="btn-secondary hidden">Retake</button>
+                        <button type="button" id="use-photo" class="btn-primary hidden">Use Photo</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Card (shown after form submission, before login) -->
+            <div id="preview-card" class="preview-card hidden">
+                <h3>Issue Preview</h3>
+                <div class="issue-card">
+                    <div class="card-header">
+                        <span class="category-tag" id="preview-category"></span>
+                    </div>
+                    <h4 id="preview-title"></h4>
+                    <p id="preview-description"></p>
+                    <p><strong>Location:</strong> <span id="preview-location"></span></p>
+                    <div id="preview-image-container"></div>
+                </div>
+                <p>Please sign in to submit your issue</p>
+                <button id="login-btn">Sign In to Submit</button>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Deccan Herald. Civic Issues Hub - Connecting citizens with solutions.</p>
+        </div>
+    </footer>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css">
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

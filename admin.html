@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Civic Issues Dashboard - Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto+Slab:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Civic Issues Dashboard</h1>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active" data-view="review">Review Issues</a></li>
+                    <li><a href="#" data-view="stats">Statistics</a></li>
+                    <li><a href="#" data-view="settings">Settings</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Review Issues View -->
+        <section id="review-view" class="view active">
+            <h2>Review New Issues</h2>
+            
+            <div class="filters">
+                <select id="status-filter-admin">
+                    <option value="">All Statuses</option>
+                    <option value="New">New</option>
+                    <option value="Verified">Verified</option>
+                    <option value="Published">Published</option>
+                    <option value="Resolved">Resolved</option>
+                </select>
+                <select id="category-filter-admin">
+                    <option value="">All Categories</option>
+                    <option value="Roads">Roads</option>
+                    <option value="Water">Water</option>
+                    <option value="Waste">Waste</option>
+                    <option value="Power">Power</option>
+                    <option value="Public Health">Public Health</option>
+                    <option value="Others">Others</option>
+                </select>
+                <button id="refresh-issues">Refresh</button>
+            </div>
+            
+            <div id="issues-container">
+                <table id="issues-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Category</th>
+                            <th>Title</th>
+                            <th>Description</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="issues-tbody">
+                        <!-- Issues will be loaded here dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Statistics View -->
+        <section id="stats-view" class="view">
+            <h2>Statistics</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Issues</h3>
+                    <p id="total-issues-count">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>New Issues</h3>
+                    <p id="new-issues-count">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Published Issues</h3>
+                    <p id="published-issues-count">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Resolved Issues</h3>
+                    <p id="resolved-issues-count">0</p>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Issues by Category</h3>
+                <canvas id="category-chart"></canvas>
+            </div>
+        </section>
+
+        <!-- Settings View -->
+        <section id="settings-view" class="view">
+            <h2>Settings</h2>
+            
+            <div class="settings-section">
+                <h3>Editorial Workflow</h3>
+                <div class="form-group">
+                    <label for="auto-verify">Auto-verify issues after (hours):</label>
+                    <input type="number" id="auto-verify" value="24" min="0">
+                </div>
+                
+                <div class="form-group">
+                    <label for="default-status">Default status for new issues:</label>
+                    <select id="default-status">
+                        <option value="New">New</option>
+                        <option value="Verified">Verified</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>Notification Settings</h3>
+                <div class="form-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="notify-new">
+                        <span class="checkmark"></span>
+                        Send notification on new issues
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="notify-resolved">
+                        <span class="checkmark"></span>
+                        Send notification when issues are resolved
+                    </label>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for viewing issue details -->
+    <div id="issue-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Issue Details</h2>
+            <div id="issue-details">
+                <!-- Issue details will be loaded here -->
+            </div>
+            <div class="modal-actions">
+                <button id="verify-issue" class="btn-secondary">Verify</button>
+                <button id="publish-issue" class="btn-primary">Publish</button>
+                <button id="reject-issue" class="btn-danger">Reject</button>
+                <button id="resolve-issue" class="btn-success">Resolve</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Deccan Herald editorial dashboard. Secure access only.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
